@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Book Your Training Session</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; background: #f5f5f5; padding: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; background: white; border-radius: 8px; padding: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1 { text-align: center; color: #333; margin-bottom: 30px; }
+        .calendar { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; margin-bottom: 30px; background: #ddd; }
+        .calendar-header { background: #333; color: white; padding: 10px; text-align: center; font-weight: bold; }
+        .calendar-day { background: white; padding: 15px 10px; text-align: center; cursor: pointer; min-height: 60px; border: 1px solid #eee; position: relative; }
+        .calendar-day:hover { background: #f0f0f0; }
+        .calendar-day.selected { background: #4CAF50; color: white; }
+        .calendar-day.has-bookings { background: #fff3cd; }
+        .booking-count { position: absolute; top: 2px; right: 2px; background: #ff4444; color: white; border-radius: 50%; width: 20px; height: 20px; font-size: 12px; display: flex; align-items: center; justify-content: center; }
+        .time-slots { display: none; margin: 20px 0; }
+        .time-slots.show { display: block; }
+        .time-slot { display: inline-block; margin: 5px; padding: 10px 15px; background: #e0e0e0; border: none; border-radius: 5px; cursor: pointer; }
+        .time-slot:hover { background: #d0d0d0; }
+        .time-slot.selected { background: #4CAF50; color: white; }
+        .time-slot.full { background: #ffcccb; cursor: not-allowed; }
+        .booking-form { display: none; background: #f9f9f9; padding: 20px; border-radius: 8px; margin: 20px 0; }
+        .booking-form.show { display: block; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; }
+        .form-group input, .form-group select { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; }
+        .btn { padding: 12px 24px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; }
+        .btn:hover { background: #45a049; }
+        .btn-secondary { background: #6c757d; }
+        .btn-secondary:hover { background: #5a6268; }
+        .trainer-link { position: absolute; top: 20px; right: 20px; }
+        .trainer-link a { color: #666; text-decoration: none; }
+        .trainer-link a:hover { color: #333; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="trainer-link">
+            <span class="user-info">Welcome, <%= user.name %></span>
+            <a href="/logout">Logout</a>
+        </div>
+        
+        <h1>📅 Book Your Training Session</h1>
+        
+        <div id="calendar" class="calendar"></div>
+        
+        <div id="timeSlots" class="time-slots">
+            <h3>Available Sessions for <span id="selectedDate"></span></h3>
+            <div id="timeSlotsContainer"></div>
+        </div>
+        
+        <div id="bookingForm" class="booking-form">
+            <h3>Book Your Session</h3>
+            <div id="sessionInfo" style="background: #e8f5e8; padding: 15px; border-radius: 5px; margin-bottom: 15px;"></div>
+            <form id="booking">
+                <div class="form-group">
+                    <label>Group Size (How many people?) *</label>
+                    <select name="groupSize" required>
+                        <option value="">Select group size</option>
+                        <option value="1">1 person</option>
+                        <option value="2">2 people</option>
+                        <option value="3">3 people</option>
+                        <option value="4">4 people</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn">Book Session</button>
+                <button type="button" class="btn btn-secondary" onclick="hideBookingForm()">Cancel</button>
+            </form>
+        </div>
+
+        <!-- Your Bookings Section -->
+        <div style="margin-top: 30px; background: white; padding: 20px; border-radius: 8px;">
+            <h3>📋 Your Booked Sessions</h3>
+            <% if (bookings.length === 0) { %>
+                <p style="color: #666; text-align: center; padding: 20px;">You haven't booked any sessions yet</p>
+            <% } else { %>
+                <% bookings.forEach(booking => { %>
+                    <div style="background: #f9f9f9; padding: 15px; margin: 10px 0; border-radius: 5px; border-left: 4px solid #4CAF50;">
+                        <div style="font-weight: bold; color: #333;">
+                            📅 <%= moment(booking.session.date).format('MMM DD, YYYY') %> at <%= booking.session.time %>
+                        </div>
+                        <div style="color: #666; margin-top: 5px;">
+                            <span class="exercise-type <%= booking.session.exerciseType %>">
+                                <%= booking.session.exerciseType === 'body-health' ? 'Body Health' : 'Regular Training' %>
+                            </span>
+                            👥 <%= booking.groupSize %> <%= booking.groupSize === 1 ? 'person' : 'people' %>
+                            <% if (moment(booking.session.date).isAfter(moment())) { %>
+                                <button class="btn btn-danger" style="margin-left: 15px; padding: 5px 10px; font-size: 0.8em;" onclick="cancelBooking('<%= booking._id %>')">
+                                    Cancel
+                                </button>
+                            <% } %>
+                        </div>
+                    </div>
+                <% }); %>
+            <% } %>
+        </div>
+    </div>
+
+    <script>
+        let selectedDate = null;
+        let selectedSession = null;
+        let sessionsData = {};
+
+        // Initialize calendar
+        function initCalendar() {
+            const calendar = document.getElementById('calendar');
+            const today = new Date();
+
+            // Calendar headers
+            const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            daysOfWeek.forEach(day => {
+                const header = document.createElement('div');
+                header.className = 'calendar-header';
+                header.textContent = day;
+                calendar.appendChild(header);
+            });
+
+            // Generate calendar days (next 30 days)
+            for (let i = 0; i < 30; i++) {
+                const date = new Date(today);
+                date.setDate(today.getDate() + i);
+                
+                const dayElement = document.createElement('div');
+                dayElement.className = 'calendar-day';
+                dayElement.textContent = date.getDate();
+                dayElement.dataset.date = date.toISOString().split('T')[0];
+                
+                // Load sessions for this date
+                loadSessionsForDate(date.toISOString().split('T')[0], dayElement);
+                
+                dayElement.addEventListener('click', () => selectDate(date.toISOString().split('T')[0], dayElement));
+                calendar.appendChild(dayElement);
+            }
+        }
+
+        // Load sessions for a specific date
+        async function loadSessionsForDate(date, dayElement) {
+            try {
+                const response = await fetch(`/api/sessions/${date}`);
+                const sessions = await response.json();
+                sessionsData[date] = sessions;
+                
+                if (sessions.length > 0) {
+                    dayElement.classList.add('has-bookings');
+                    const totalSpots = sessions.reduce((sum, s) => sum + s.spotsLeft, 0);
+                    if (totalSpots > 0) {
+                        const countElement = document.createElement('div');
+                        countElement.className = 'booking-count';
+                        countElement.textContent = totalSpots;
+                        dayElement.appendChild(countElement);
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading sessions:', error);
+            }
+        }
+
+        // Select a date
+        function selectDate(date, dayElement) {
+            // Remove previous selection
+            document.querySelectorAll('.calendar-day.selected').forEach(el => el.classList.remove('selected'));
+            dayElement.classList.add('selected');
+            
+            selectedDate = date;
+            document.getElementById('selectedDate').textContent = new Date(date).toLocaleDateString();
+            
+            showTimeSlots();
+        }
+
+        // Show available sessions
+        function showTimeSlots() {
+            const timeSlotsContainer = document.getElementById('timeSlotsContainer');
+            const timeSlots = document.getElementById('timeSlots');
+            
+            timeSlotsContainer.innerHTML = '';
+            timeSlots.classList.add('show');
+            
+            const sessions = sessionsData[selectedDate] || [];
+            
+            if (sessions.length === 0) {
+                timeSlotsContainer.innerHTML = '<p style="color: #666; text-align: center; padding: 20px;">No sessions available for this date</p>';
+                return;
+            }
+
+            // Generate session buttons
+            sessions.forEach(session => {
+                const button = document.createElement('button');
+                button.className = 'time-slot';
+                
+                const exerciseTypeLabel = session.exerciseType === 'body-health' ? 'Body Health' : 'Regular Training';
+                button.innerHTML = `
+                    <div style="font-weight: bold;">${session.time}</div>
+                    <div style="font-size: 0.8em; margin-top: 3px;">${exerciseTypeLabel}</div>
+                    <div style="font-size: 0.8em;">${session.spotsLeft}/${session.maxCapacity} spots left</div>
+                `;
+                
+                if (session.spotsLeft <= 0) {
+                    button.classList.add('full');
+                    button.disabled = true;
+                } else {
+                    button.addEventListener('click', () => selectSession(session, button));
+                }
+                
+                timeSlotsContainer.appendChild(button);
+            });
+        }
+
+        // Select a session
+        function selectSession(session, button) {
+            document.querySelectorAll('.time-slot.selected').forEach(el => el.classList.remove('selected'));
+            button.classList.add('selected');
+            selectedSession = session;
+            showBookingForm();
+        }
+
+        // Show booking form
+        function showBookingForm() {
+            const sessionInfo = document.getElementById('sessionInfo');
+            const exerciseTypeLabel = selectedSession.exerciseType === 'body-health' ? 'Body Health' : 'Regular Training';
+            
+            sessionInfo.innerHTML = `
+                <div><strong>Session Details:</strong></div>
+                <div>📅 ${new Date(selectedDate).toLocaleDateString()} at ${selectedSession.time}</div>
+                <div>🏃‍♀️ ${exerciseTypeLabel}</div>
+                <div>👥 ${selectedSession.spotsLeft} spots available (max ${selectedSession.maxCapacity} people)</div>
+            `;
+            
+            // Update group size options based on available spots
+            const groupSizeSelect = document.querySelector('select[name="groupSize"]');
+            groupSizeSelect.innerHTML = '<option value="">Select group size</option>';
+            
+            for (let i = 1; i <= Math.min(4, selectedSession.spotsLeft); i++) {
+                const option = document.createElement('option');
+                option.value = i;
+                option.textContent = `${i} ${i === 1 ? 'person' : 'people'}`;
+                groupSizeSelect.appendChild(option);
+            }
+            
+            document.getElementById('bookingForm').classList.add('show');
+        }
+
+        // Hide booking form
+        function hideBookingForm() {
+            document.getElementById('bookingForm').classList.remove('show');
+        }
+
+        // Handle booking submission
+        document.getElementById('booking').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = new FormData(e.target);
+            const bookingData = {
+                sessionId: selectedSession._id,
+                groupSize: formData.get('groupSize')
+            };
+            
+            try {
+                const response = await fetch('/api/booking', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(bookingData)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert('Session booked successfully! 🎉');
+                    location.reload();
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                alert('Error booking session: ' + error.message);
+            }
+        });
+
+        // Cancel booking
+        async function cancelBooking(bookingId) {
+            if (!confirm('Are you sure you want to cancel this booking?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/booking/${bookingId}`, {
+                    method: 'DELETE'
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    alert('Booking cancelled successfully!');
+                    location.reload();
+                } else {
+                    alert('Error cancelling booking: ' + result.error);
+                }
+            } catch (error) {
+                alert('Error cancelling booking: ' + error.message);
+            }
+        }
+
+        // Initialize the calendar when page loads
+        initCalendar();
+    </script>
+</body>
+</html>
