@@ -48,6 +48,7 @@ const BookingSchema = new mongoose.Schema({
   client: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   groupSize: { type: Number, min: 1, max: 4, required: true },
   status: { type: String, enum: ['confirmed', 'cancelled'], default: 'confirmed' },
+  notes: { type: String, default: '' },
   createdAt: { type: Date, default: Date.now }
 });
 
@@ -65,7 +66,127 @@ app.set('views', path.join(__dirname, 'views'));
 // Simple session middleware (store user in memory for MVP)
 let currentUser = null;
 
-// Routes
+// Middleware to check authentication
+function requireAuth(req, res, next) {
+  if (!currentUser) {
+    return res.redirect('/login');
+  }
+  next();
+}
+
+function requireAdmin(req, res, next) {
+  if (!currentUser || currentUser.role !== 'admin') {
+    return res.redirect('/login');
+  }
+  next();
+}
+
+// CALENDAR API ROUTES (NEW)
+// API: Get sessions for a specific month (for calendar display)
+app.get('/api/calendar/:year/:month', requireAdmin, async (req, res) => {
+  try {
+    const year = parseInt(req.params.year);
+    const month = parseInt(req.params.month) - 1; // JavaScript months are 0-indexed
+    
+    const startDate = new Date(year, month, 1);
+    const endDate = new Date(year, month + 1, 0);
+    
+    const sessions = await Session.find({
+      date: {
+        $gte: startDate,
+        $lte: endDate
+      },
+      isActive: true
+    }).populate('createdBy');
+    
+    // Get bookings for each session
+    const sessionsWithBookings = await Promise.all(
+      sessions.map(async (session) => {
+        const bookings = await Booking.find({ 
+          session: session._id, 
+          status: 'confirmed' 
+        }).populate('client');
+        
+        return {
+          ...session.toObject(),
+          bookings: bookings
+        };
+      })
+    );
+    
+    res.json(sessionsWithBookings);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// API: Get detailed sessions for a specific date
+app.get('/api/sessions/date/:date', requireAdmin, async (req, res) => {
+  try {
+    const date = new Date(req.params.date);
+    const nextDay = new Date(date);
+    nextDay.setDate(date.getDate() + 1);
+    
+    const sessions = await Session.find({
+      date: {
+        $gte: date,
+        $lt: nextDay
+      },
+      isActive: true
+    }).populate('createdBy').sort({ time: 1 });
+    
+    // Get bookings with client details for each session
+    const sessionsWithDetails = await Promise.all(
+      sessions.map(async (session) => {
+        const bookings = await Booking.find({ 
+          session: session._id, 
+          status: 'confirmed' 
+        }).populate('client', 'name email phone');
+        
+        const totalBooked = bookings.reduce((sum, booking) => sum + booking.groupSize, 0);
+        
+        return {
+          ...session.toObject(),
+          bookings: bookings,
+          currentBookings: totalBooked,
+          spotsLeft: session.maxCapacity - totalBooked
+        };
+      })
+    );
+    
+    res.json(sessionsWithDetails);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// API: Get session details with all bookings (for modal view)
+app.get('/api/session/:id/details', requireAdmin, async (req, res) => {
+  try {
+    const session = await Session.findById(req.params.id).populate('createdBy');
+    if (!session) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+    
+    const bookings = await Booking.find({ 
+      session: session._id, 
+      status: 'confirmed' 
+    }).populate('client', 'name email phone');
+    
+    const totalBooked = bookings.reduce((sum, booking) => sum + booking.groupSize, 0);
+    
+    res.json({
+      ...session.toObject(),
+      bookings: bookings,
+      currentBookings: totalBooked,
+      spotsLeft: session.maxCapacity - totalBooked
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// EXISTING ROUTES
 // Login/Register page
 app.get('/login', (req, res) => {
   res.render('login');
@@ -121,21 +242,6 @@ app.get('/logout', (req, res) => {
   currentUser = null;
   res.redirect('/login');
 });
-
-// Middleware to check authentication
-function requireAuth(req, res, next) {
-  if (!currentUser) {
-    return res.redirect('/login');
-  }
-  next();
-}
-
-function requireAdmin(req, res, next) {
-  if (!currentUser || currentUser.role !== 'admin') {
-    return res.redirect('/login');
-  }
-  next();
-}
 
 // Home page - Calendar booking for clients
 app.get('/', requireAuth, async (req, res) => {
@@ -292,6 +398,26 @@ app.delete('/api/booking/:id', requireAuth, async (req, res) => {
     
     await Booking.findByIdAndDelete(req.params.id);
     res.json({ success: true });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// API: Update booking notes (Admin only)
+app.put('/api/booking/:id/notes', requireAdmin, async (req, res) => {
+  try {
+    const { notes } = req.body;
+    const booking = await Booking.findByIdAndUpdate(
+      req.params.id,
+      { notes: notes || '' },
+      { new: true }
+    ).populate('client', 'name email phone');
+    
+    if (!booking) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+    
+    res.json({ success: true, booking });
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
