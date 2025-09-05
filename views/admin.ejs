@@ -27,6 +27,8 @@
         .btn-danger { background: #dc3545; }
         .btn-danger:hover { background: #c82333; }
         .btn-small { padding: 5px 10px; font-size: 0.9em; }
+        .btn-email { background: #2196F3; }
+        .btn-email:hover { background: #1976D2; }
         .session-item { background: #f9f9f9; padding: 15px; margin-bottom: 10px; border-radius: 5px; border-left: 4px solid #4CAF50; }
         .session-item.body-health { border-left-color: #2196F3; }
         .session-item.regular-training { border-left-color: #FF9800; }
@@ -361,6 +363,43 @@
         </div>
     </div>
 
+    <!-- Email Modal -->
+    <div id="emailModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>📧 Send Email to Session Members</h3>
+                <span class="close" onclick="closeModal('emailModal')">&times;</span>
+            </div>
+            <div id="emailModalContent">
+                <form id="emailForm">
+                    <input type="hidden" id="emailSessionId" name="sessionId" value="">
+                    
+                    <div class="form-group">
+                        <label>Recipients</label>
+                        <div id="recipientsList" style="max-height: 120px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; border-radius: 4px; background: #f9f9f9;">
+                            <!-- Recipients will be populated here -->
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Subject</label>
+                        <input type="text" name="subject" required placeholder="Enter email subject">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Message</label>
+                        <textarea name="message" required rows="6" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; resize: vertical;" placeholder="Enter your message to the session members..."></textarea>
+                    </div>
+                    
+                    <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                        <button type="button" class="btn" style="background: #6c757d;" onclick="closeModal('emailModal')">Cancel</button>
+                        <button type="submit" class="btn btn-email">Send Email</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <script>
         let currentDate = new Date();
         let currentMonthSessions = [];
@@ -518,6 +557,14 @@
                                     ${session.bookings.length > 0 ? '👥' : '⭕'}
                                 </div>
                             </div>
+                            <div style="margin-top: 10px;">
+                                <button class="btn btn-email btn-small" onclick="event.stopPropagation(); showEmailModal('${session._id}', ${JSON.stringify(session.bookings).replace(/"/g, '&quot;')})">
+                                    📧 Email Members
+                                </button>
+                                <button class="btn btn-danger btn-small" onclick="event.stopPropagation(); deleteSession('${session._id}')" style="margin-left: 10px;">
+                                    🗑️ Delete Session
+                                </button>
+                            </div>
                         </div>
                     `).join('');
                 }
@@ -576,7 +623,7 @@
                                 </div>
                             </div>
                             
-                            <div style="margin-top: 8px;">
+                            <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #ddd;">
                                 <button class="btn btn-danger btn-small" onclick="deleteBooking('${booking._id}')">
                                     🗑️ Cancel Booking
                                 </button>
@@ -599,14 +646,82 @@
             document.getElementById(modalId).style.display = 'none';
         }
 
+        function showEmailModal(sessionId, bookings) {
+            const modal = document.getElementById('emailModal');
+            const sessionIdInput = document.getElementById('emailSessionId');
+            const recipientsList = document.getElementById('recipientsList');
+            
+            sessionIdInput.value = sessionId;
+            
+            // Populate recipients list
+            if (bookings && bookings.length > 0) {
+                recipientsList.innerHTML = bookings.map(booking => `
+                    <div style="margin-bottom: 8px;">
+                        <label style="display: flex; align-items: center; font-size: 0.9em;">
+                            <input type="checkbox" name="recipients" value="${booking.client._id}" checked style="margin-right: 8px;">
+                            👤 ${booking.client.name} (${booking.client.email}) - ${booking.groupSize} ${booking.groupSize === 1 ? 'person' : 'people'}
+                        </label>
+                    </div>
+                `).join('');
+            } else {
+                recipientsList.innerHTML = '<p style="color: #666; text-align: center;">No members in this session</p>';
+            }
+            
+            modal.style.display = 'block';
+        }
+
+        // Handle email form submission
+        document.getElementById('emailForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = new FormData(e.target);
+            const recipients = Array.from(formData.getAll('recipients'));
+            
+            if (recipients.length === 0) {
+                alert('Please select at least one recipient');
+                return;
+            }
+            
+            const emailData = {
+                sessionId: formData.get('sessionId'),
+                subject: formData.get('subject'),
+                message: formData.get('message'),
+                recipients: recipients
+            };
+            
+            try {
+                const response = await fetch('/api/send-session-email', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(emailData)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert(`Email sent successfully to ${recipients.length} recipient${recipients.length > 1 ? 's' : ''}!`);
+                    closeModal('emailModal');
+                    e.target.reset();
+                } else {
+                    alert('Error sending email: ' + result.error);
+                }
+            } catch (error) {
+                alert('Error sending email: ' + error.message);
+            }
+        });
+
         window.onclick = function(event) {
             const sessionsModal = document.getElementById('sessionsModal');
             const membersModal = document.getElementById('membersModal');
+            const emailModal = document.getElementById('emailModal');
             if (event.target === sessionsModal) {
                 sessionsModal.style.display = 'none';
             }
             if (event.target === membersModal) {
                 membersModal.style.display = 'none';
+            }
+            if (event.target === emailModal) {
+                emailModal.style.display = 'none';
             }
         }
 

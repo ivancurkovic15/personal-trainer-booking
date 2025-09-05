@@ -22,6 +22,9 @@
         .switch-form { text-align: center; color: #666; }
         .switch-form a { color: #4CAF50; text-decoration: none; font-weight: bold; }
         .switch-form a:hover { text-decoration: underline; }
+        .forgot-password { text-align: center; margin: 10px 0; }
+        .forgot-password a { color: #666; text-decoration: none; font-size: 0.9em; }
+        .forgot-password a:hover { text-decoration: underline; }
         .error { background: #ffcccb; border: 1px solid #ff0000; color: #d00; padding: 10px; border-radius: 5px; margin-bottom: 15px; }
         .role-info { font-size: 12px; color: #666; margin-top: 5px; }
     </style>
@@ -46,6 +49,9 @@
                     <input type="password" name="password" required>
                 </div>
                 <button type="submit" class="btn">Login</button>
+                <div class="forgot-password">
+                    <a href="/forgot-password">Forgot your password?</a>
+                </div>
             </form>
             <div class="switch-form">
                 Don't have an account? <a href="#" onclick="showRegister()">Register here</a>

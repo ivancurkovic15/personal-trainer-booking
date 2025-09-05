@@ -6,6 +6,11 @@ const mongoose = require('mongoose');
 const bodyParser = require('body-parser');
 const moment = require('moment');
 const path = require('path');
+const crypto = require('crypto');
+
+// Import email service and reminder scheduler
+const emailService = require('./emailService');
+const reminderScheduler = require('./reminderScheduler');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -20,13 +25,15 @@ if (!MONGODB_URI) {
 
 mongoose.connect(MONGODB_URI);
 
-// User Schema
+// User Schema (updated with password reset fields)
 const UserSchema = new mongoose.Schema({
   name: { type: String, required: true },
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
   role: { type: String, enum: ['admin', 'client'], default: 'client' },
   phone: { type: String },
+  resetPasswordToken: { type: String },
+  resetPasswordExpires: { type: Date },
   createdAt: { type: Date, default: Date.now }
 });
 
@@ -42,19 +49,23 @@ const SessionSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now }
 });
 
-// Booking Schema (Clients book sessions)
+// Booking Schema (Clients book sessions) - updated with reminder tracking
 const BookingSchema = new mongoose.Schema({
   session: { type: mongoose.Schema.Types.ObjectId, ref: 'Session', required: true },
   client: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   groupSize: { type: Number, min: 1, max: 4, required: true },
   status: { type: String, enum: ['confirmed', 'cancelled'], default: 'confirmed' },
   notes: { type: String, default: '' },
+  reminderSent: { type: Boolean, default: false },
   createdAt: { type: Date, default: Date.now }
 });
 
 const User = mongoose.model('User', UserSchema);
 const Session = mongoose.model('Session', SessionSchema);
 const Booking = mongoose.model('Booking', BookingSchema);
+
+// Initialize reminder scheduler
+reminderScheduler.initializeScheduler(Session, Booking, User);
 
 // Middleware
 app.use(bodyParser.urlencoded({ extended: true }));
@@ -81,7 +92,7 @@ function requireAdmin(req, res, next) {
   next();
 }
 
-// CALENDAR API ROUTES (NEW)
+// CALENDAR API ROUTES
 // API: Get sessions for a specific month (for calendar display)
 app.get('/api/calendar/:year/:month', requireAdmin, async (req, res) => {
   try {
@@ -181,6 +192,177 @@ app.get('/api/session/:id/details', requireAdmin, async (req, res) => {
       currentBookings: totalBooked,
       spotsLeft: session.maxCapacity - totalBooked
     });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// PASSWORD RESET ROUTES
+app.get('/forgot-password', (req, res) => {
+  res.render('forgot-password');
+});
+
+app.post('/forgot-password', async (req, res) => {
+  try {
+    const { email } = req.body;
+    const user = await User.findOne({ email });
+    
+    if (!user) {
+      return res.render('forgot-password', { 
+        message: 'If an account with that email exists, a password reset link has been sent.' 
+      });
+    }
+    
+    // Generate reset token
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const resetTokenExpiry = Date.now() + 3600000; // 1 hour
+    
+    user.resetPasswordToken = resetToken;
+    user.resetPasswordExpires = resetTokenExpiry;
+    await user.save();
+    
+    // Send reset email
+    const result = await emailService.sendPasswordReset(user, resetToken);
+    
+    if (result.success) {
+      res.render('forgot-password', { 
+        message: 'If an account with that email exists, a password reset link has been sent.' 
+      });
+    } else {
+      res.render('forgot-password', { 
+        error: 'Error sending reset email. Please try again.' 
+      });
+    }
+  } catch (error) {
+    res.render('forgot-password', { 
+      error: 'Error processing request. Please try again.' 
+    });
+  }
+});
+
+app.get('/reset-password', async (req, res) => {
+  try {
+    const { token } = req.query;
+    
+    if (!token) {
+      return res.render('reset-password', { error: 'Invalid or missing reset token.' });
+    }
+    
+    const user = await User.findOne({
+      resetPasswordToken: token,
+      resetPasswordExpires: { $gt: Date.now() }
+    });
+    
+    if (!user) {
+      return res.render('reset-password', { error: 'Password reset token is invalid or has expired.' });
+    }
+    
+    res.render('reset-password', { token });
+  } catch (error) {
+    res.render('reset-password', { error: 'Error validating reset token.' });
+  }
+});
+
+app.post('/reset-password', async (req, res) => {
+  try {
+    const { token, password, confirmPassword } = req.body;
+    
+    if (password !== confirmPassword) {
+      return res.render('reset-password', { 
+        token, 
+        error: 'Passwords do not match.' 
+      });
+    }
+    
+    if (password.length < 6) {
+      return res.render('reset-password', { 
+        token, 
+        error: 'Password must be at least 6 characters long.' 
+      });
+    }
+    
+    const user = await User.findOne({
+      resetPasswordToken: token,
+      resetPasswordExpires: { $gt: Date.now() }
+    });
+    
+    if (!user) {
+      return res.render('reset-password', { 
+        error: 'Password reset token is invalid or has expired.' 
+      });
+    }
+    
+    // Update password and clear reset fields
+    user.password = password;
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpires = undefined;
+    await user.save();
+    
+    res.render('reset-password', { 
+      success: 'Password has been reset successfully. You can now log in with your new password.' 
+    });
+  } catch (error) {
+    res.render('reset-password', { 
+      token: req.body.token, 
+      error: 'Error resetting password. Please try again.' 
+    });
+  }
+});
+
+// EMAIL FUNCTIONALITY ROUTES
+// API: Send custom email to session members
+app.post('/api/send-session-email', requireAdmin, async (req, res) => {
+  try {
+    const { sessionId, subject, message, recipients } = req.body;
+    
+    if (!sessionId || !subject || !message || !recipients || recipients.length === 0) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+    
+    // Get session details
+    const session = await Session.findById(sessionId);
+    if (!session) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+    
+    // Get recipient details
+    const recipientUsers = await User.find({ _id: { $in: recipients } });
+    
+    // Send emails
+    const results = await emailService.sendBulkCustomMessage(recipientUsers, subject, message);
+    
+    res.json({ success: true, results });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// API: Send custom email to specific clients
+app.post('/api/send-custom-email', requireAdmin, async (req, res) => {
+  try {
+    const { recipients, subject, message } = req.body;
+    
+    if (!recipients || !subject || !message || recipients.length === 0) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+    
+    // Get recipient details
+    const recipientUsers = await User.find({ _id: { $in: recipients } });
+    
+    // Send emails
+    const results = await emailService.sendBulkCustomMessage(recipientUsers, subject, message);
+    
+    res.json({ success: true, results });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// API: Test reminder system (for development)
+app.post('/api/test-reminders', requireAdmin, async (req, res) => {
+  try {
+    await reminderScheduler.sendRemindersNow();
+    res.json({ success: true, message: 'Reminder check triggered' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -338,7 +520,7 @@ app.post('/api/session', requireAdmin, async (req, res) => {
   }
 });
 
-// API: Create new booking (Clients)
+// API: Create new booking (Clients) - WITH EMAIL NOTIFICATIONS
 app.post('/api/booking', requireAuth, async (req, res) => {
   try {
     const { sessionId, groupSize } = req.body;
@@ -347,7 +529,7 @@ app.post('/api/booking', requireAuth, async (req, res) => {
       return res.status(403).json({ error: 'Admins cannot book sessions' });
     }
     
-    const session = await Session.findById(sessionId);
+    const session = await Session.findById(sessionId).populate('createdBy');
     if (!session || !session.isActive) {
       return res.status(400).json({ error: 'Session not available' });
     }
@@ -367,6 +549,21 @@ app.post('/api/booking', requireAuth, async (req, res) => {
     });
     
     await booking.save();
+    
+    // Send confirmation emails
+    try {
+      const emailResult = await emailService.sendBookingConfirmation(
+        booking, 
+        session, 
+        currentUser, 
+        session.createdBy
+      );
+      console.log('Booking confirmation emails sent:', emailResult);
+    } catch (emailError) {
+      console.error('Error sending confirmation emails:', emailError);
+      // Don't fail the booking if email fails
+    }
+    
     res.json({ success: true, booking });
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -376,24 +573,53 @@ app.post('/api/booking', requireAuth, async (req, res) => {
 // API: Delete session (Admin only)
 app.delete('/api/session/:id', requireAdmin, async (req, res) => {
   try {
-    // First delete all bookings for this session
+    // Get all bookings for this session before deleting
+    const bookings = await Booking.find({ session: req.params.id, status: 'confirmed' })
+      .populate(['session', 'client']);
+    
+    // Send cancellation emails to all booked clients
+    for (const booking of bookings) {
+      try {
+        await emailService.sendCancellationNotification(
+          booking, 
+          booking.session, 
+          booking.client
+        );
+      } catch (emailError) {
+        console.error('Error sending cancellation email:', emailError);
+      }
+    }
+    
+    // Delete all bookings for this session
     await Booking.deleteMany({ session: req.params.id });
     // Then delete the session
     await Session.findByIdAndDelete(req.params.id);
+    
     res.json({ success: true });
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
 });
 
-// API: Delete booking
+// API: Delete booking - WITH EMAIL NOTIFICATIONS
 app.delete('/api/booking/:id', requireAuth, async (req, res) => {
   try {
-    const booking = await Booking.findById(req.params.id).populate('session');
+    const booking = await Booking.findById(req.params.id).populate(['session', 'client']);
     
     // Check if user owns this booking or is admin
-    if (currentUser.role !== 'admin' && booking.client.toString() !== currentUser._id.toString()) {
+    if (currentUser.role !== 'admin' && booking.client._id.toString() !== currentUser._id.toString()) {
       return res.status(403).json({ error: 'Not authorized' });
+    }
+    
+    // Send cancellation email
+    try {
+      await emailService.sendCancellationNotification(
+        booking, 
+        booking.session, 
+        booking.client
+      );
+    } catch (emailError) {
+      console.error('Error sending cancellation email:', emailError);
     }
     
     await Booking.findByIdAndDelete(req.params.id);
@@ -426,4 +652,6 @@ app.put('/api/booking/:id/notes', requireAdmin, async (req, res) => {
 app.listen(PORT, () => {
   console.log(`Personal Trainer Booking System running on http://localhost:${PORT}`);
   console.log(`Admin Dashboard: http://localhost:${PORT}/admin`);
+  console.log('Email service initialized');
+  console.log('Reminder scheduler running - will send 2-hour reminders automatically');
 });
