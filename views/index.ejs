@@ -18,22 +18,46 @@
         .booking-count { position: absolute; top: 2px; right: 2px; background: #ff4444; color: white; border-radius: 50%; width: 20px; height: 20px; font-size: 12px; display: flex; align-items: center; justify-content: center; }
         .time-slots { display: none; margin: 20px 0; }
         .time-slots.show { display: block; }
-        .time-slot { display: inline-block; margin: 5px; padding: 10px 15px; background: #e0e0e0; border: none; border-radius: 5px; cursor: pointer; }
+        .time-slot { display: inline-block; margin: 5px; padding: 15px; background: #e0e0e0; border: none; border-radius: 8px; cursor: pointer; min-width: 280px; vertical-align: top; }
         .time-slot:hover { background: #d0d0d0; }
         .time-slot.selected { background: #4CAF50; color: white; }
         .time-slot.full { background: #ffcccb; cursor: not-allowed; }
+        .time-slot-header { font-weight: bold; font-size: 1.1em; margin-bottom: 8px; }
+        .time-slot-trainer { color: #4CAF50; font-weight: bold; margin-bottom: 5px; }
+        .time-slot.selected .time-slot-trainer { color: white; }
+        .time-slot-details { font-size: 0.9em; color: #666; margin-bottom: 5px; }
+        .time-slot.selected .time-slot-details { color: rgba(255,255,255,0.9); }
+        .time-slot-pricing { background: rgba(76, 175, 80, 0.1); padding: 6px 8px; border-radius: 4px; font-size: 0.8em; margin: 5px 0; }
+        .time-slot.selected .time-slot-pricing { background: rgba(255,255,255,0.2); color: white; }
+        .exercise-type { display: inline-block; padding: 4px 8px; border-radius: 12px; font-size: 0.8em; font-weight: bold; color: white; margin-right: 10px; }
+        .exercise-type.body-health { background: #2196F3; }
+        .exercise-type.regular-training { background: #FF9800; }
         .booking-form { display: none; background: #f9f9f9; padding: 20px; border-radius: 8px; margin: 20px 0; }
         .booking-form.show { display: block; }
         .form-group { margin-bottom: 15px; }
         .form-group label { display: block; margin-bottom: 5px; font-weight: bold; }
         .form-group input, .form-group select { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; }
+        .booking-type-selector { display: flex; gap: 15px; margin-bottom: 15px; }
+        .booking-option { flex: 1; padding: 15px; border: 2px solid #ddd; border-radius: 8px; text-align: center; cursor: pointer; transition: all 0.3s; }
+        .booking-option:hover { border-color: #4CAF50; background: #f8f8f8; }
+        .booking-option.selected { border-color: #4CAF50; background: #e8f5e8; }
+        .booking-option-title { font-weight: bold; margin-bottom: 5px; }
+        .booking-option-price { color: #4CAF50; font-size: 1.2em; font-weight: bold; }
+        .booking-option-details { color: #666; font-size: 0.9em; margin-top: 5px; }
         .btn { padding: 12px 24px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; }
         .btn:hover { background: #45a049; }
         .btn-secondary { background: #6c757d; }
         .btn-secondary:hover { background: #5a6268; }
+        .btn-danger { background: #dc3545; }
+        .btn-danger:hover { background: #c82333; }
         .trainer-link { position: absolute; top: 20px; right: 20px; }
         .trainer-link a { color: #666; text-decoration: none; }
         .trainer-link a:hover { color: #333; }
+        .cancellation-policy { background: #fff3cd; border: 1px solid #ffeaa7; padding: 12px; border-radius: 4px; margin: 15px 0; color: #856404; }
+        .package-info { background: #e8f4f8; border: 1px solid #bee5eb; padding: 12px; border-radius: 4px; margin: 10px 0; color: #0c5460; }
+        .booking-item { background: #f9f9f9; padding: 15px; margin: 10px 0; border-radius: 5px; border-left: 4px solid #4CAF50; }
+        .cannot-cancel { opacity: 0.6; }
+        .cancellation-warning { color: #dc3545; font-weight: bold; font-size: 0.9em; }
     </style>
 </head>
 <body>
@@ -45,6 +69,10 @@
         
         <h1>📅 Book Your Training Session</h1>
         
+        <div class="cancellation-policy">
+            <strong>📋 Cancellation Policy:</strong> You can cancel your booking up to 24 hours before the session time. After this deadline, cancellations are not allowed.
+        </div>
+        
         <div id="calendar" class="calendar"></div>
         
         <div id="timeSlots" class="time-slots">
@@ -55,7 +83,34 @@
         <div id="bookingForm" class="booking-form">
             <h3>Book Your Session</h3>
             <div id="sessionInfo" style="background: #e8f5e8; padding: 15px; border-radius: 5px; margin-bottom: 15px;"></div>
+            
+            <div class="booking-type-selector">
+                <div class="booking-option" data-type="single" onclick="selectBookingType('single')">
+                    <div class="booking-option-title">Single Session</div>
+                    <div class="booking-option-price" id="singlePrice">$0</div>
+                    <div class="booking-option-details">Pay per session</div>
+                </div>
+                <div class="booking-option" data-type="package" onclick="selectBookingType('package')">
+                    <div class="booking-option-title">8-Session Package</div>
+                    <div class="booking-option-price" id="packagePrice">$0</div>
+                    <div class="booking-option-details" id="packageDetails">Better value - use within 90 days</div>
+                </div>
+            </div>
+            
+            <div id="packageInfo" class="package-info" style="display: none;">
+                <strong>📦 Package Benefits:</strong>
+                <ul style="margin: 8px 0 0 20px;">
+                    <li>Better value than individual sessions</li>
+                    <li>Use sessions within the specified timeframe</li>
+                    <li>Same 24-hour cancellation policy applies</li>
+                </ul>
+            </div>
+            
             <form id="booking">
+                <input type="hidden" name="bookingType" value="false">
+                <input type="hidden" name="packageId" value="">
+                <input type="hidden" name="sessionNumber" value="">
+                
                 <div class="form-group">
                     <label>Group Size (How many people?) *</label>
                     <select name="groupSize" required>
@@ -78,21 +133,43 @@
                 <p style="color: #666; text-align: center; padding: 20px;">You haven't booked any sessions yet</p>
             <% } else { %>
                 <% bookings.forEach(booking => { %>
-                    <div style="background: #f9f9f9; padding: 15px; margin: 10px 0; border-radius: 5px; border-left: 4px solid #4CAF50;">
-                        <div style="font-weight: bold; color: #333;">
+                    <div class="booking-item <%= moment().isAfter(moment(booking.cancellationDeadline)) ? 'cannot-cancel' : '' %>">
+                        <div style="font-weight: bold; color: #333; margin-bottom: 5px;">
                             📅 <%= moment(booking.session.date).format('MMM DD, YYYY') %> at <%= booking.session.time %>
                         </div>
-                        <div style="color: #666; margin-top: 5px;">
+                        <div style="color: #4CAF50; font-weight: bold; margin-bottom: 5px;">
+                            👨‍🏫 Trainer: <%= booking.session.trainer ? booking.session.trainer.name : 'No trainer assigned' %>
+                        </div>
+                        <div style="color: #666; margin-bottom: 5px;">
                             <span class="exercise-type <%= booking.session.exerciseType %>">
                                 <%= booking.session.exerciseType === 'body-health' ? 'Body Health' : 'Regular Training' %>
                             </span>
                             👥 <%= booking.groupSize %> <%= booking.groupSize === 1 ? 'person' : 'people' %>
-                            <% if (moment(booking.session.date).isAfter(moment())) { %>
-                                <button class="btn btn-danger" style="margin-left: 15px; padding: 5px 10px; font-size: 0.8em;" onclick="cancelBooking('<%= booking._id %>')">
-                                    Cancel
-                                </button>
-                            <% } %>
                         </div>
+                        <% if (booking.session.description) { %>
+                            <div style="color: #666; font-size: 0.9em; margin-bottom: 5px;">
+                                <%= booking.session.description %>
+                            </div>
+                        <% } %>
+                        <% if (booking.isPackageBooking) { %>
+                            <div class="package-info">
+                                📦 Package Booking - Session <%= booking.sessionNumber %>/8
+                            </div>
+                        <% } %>
+                        <div style="color: #666; font-size: 0.9em; margin: 8px 0;">
+                            ⏰ Cancellation deadline: <%= moment(booking.cancellationDeadline).format('MMM DD, YYYY HH:mm') %>
+                        </div>
+                        <% if (moment(booking.session.date).isAfter(moment())) { %>
+                            <% if (moment().isBefore(moment(booking.cancellationDeadline))) { %>
+                                <button class="btn btn-danger" style="margin-top: 10px; padding: 8px 16px; font-size: 0.9em;" onclick="cancelBooking('<%= booking._id %>')">
+                                    Cancel Booking
+                                </button>
+                            <% } else { %>
+                                <div class="cancellation-warning" style="margin-top: 10px;">
+                                    ⚠️ Cancellation deadline has passed (24 hours before session)
+                                </div>
+                            <% } %>
+                        <% } %>
                     </div>
                 <% }); %>
             <% } %>
@@ -103,6 +180,7 @@
         let selectedDate = null;
         let selectedSession = null;
         let sessionsData = {};
+        let selectedBookingType = 'single';
 
         // Initialize calendar
         function initCalendar() {
@@ -191,10 +269,20 @@
                 button.className = 'time-slot';
                 
                 const exerciseTypeLabel = session.exerciseType === 'body-health' ? 'Body Health' : 'Regular Training';
+                const trainerName = session.trainer ? session.trainer.name : 'No trainer assigned';
+                
                 button.innerHTML = `
-                    <div style="font-weight: bold;">${session.time}</div>
-                    <div style="font-size: 0.8em; margin-top: 3px;">${exerciseTypeLabel}</div>
-                    <div style="font-size: 0.8em;">${session.spotsLeft}/${session.maxCapacity} spots left</div>
+                    <div class="time-slot-header">${session.time}</div>
+                    <div class="time-slot-trainer">👨‍🏫 ${trainerName}</div>
+                    <div style="margin-bottom: 8px;">
+                        <span class="exercise-type ${session.exerciseType}">${exerciseTypeLabel}</span>
+                    </div>
+                    ${session.description ? `<div class="time-slot-details">${session.description}</div>` : ''}
+                    <div class="time-slot-pricing">
+                        💰 Single: ${session.price} | Package: ${session.packagePrice}
+                    </div>
+                    <div class="time-slot-details">📝 Package valid for ${session.packageDuration} days</div>
+                    <div class="time-slot-details">👥 ${session.spotsLeft}/${session.maxCapacity} spots left</div>
                 `;
                 
                 if (session.spotsLeft <= 0) {
@@ -216,17 +304,47 @@
             showBookingForm();
         }
 
+        // Select booking type
+        function selectBookingType(type) {
+            selectedBookingType = type;
+            document.querySelectorAll('.booking-option').forEach(el => el.classList.remove('selected'));
+            document.querySelector(`[data-type="${type}"]`).classList.add('selected');
+            document.querySelector('input[name="bookingType"]').value = type === 'package' ? 'true' : 'false';
+            
+            if (type === 'package') {
+                document.getElementById('packageInfo').style.display = 'block';
+                // Generate a package ID for new packages
+                document.querySelector('input[name="packageId"]').value = generatePackageId();
+                document.querySelector('input[name="sessionNumber"]').value = '1';
+            } else {
+                document.getElementById('packageInfo').style.display = 'none';
+                document.querySelector('input[name="packageId"]').value = '';
+                document.querySelector('input[name="sessionNumber"]').value = '';
+            }
+        }
+
         // Show booking form
         function showBookingForm() {
             const sessionInfo = document.getElementById('sessionInfo');
             const exerciseTypeLabel = selectedSession.exerciseType === 'body-health' ? 'Body Health' : 'Regular Training';
+            const trainerName = selectedSession.trainer ? selectedSession.trainer.name : 'No trainer assigned';
             
             sessionInfo.innerHTML = `
                 <div><strong>Session Details:</strong></div>
                 <div>📅 ${new Date(selectedDate).toLocaleDateString()} at ${selectedSession.time}</div>
+                <div>👨‍🏫 Trainer: ${trainerName}</div>
                 <div>🏃‍♀️ ${exerciseTypeLabel}</div>
+                ${selectedSession.description ? `<div>📝 ${selectedSession.description}</div>` : ''}
                 <div>👥 ${selectedSession.spotsLeft} spots available (max ${selectedSession.maxCapacity} people)</div>
             `;
+            
+            // Update pricing information
+            document.getElementById('singlePrice').textContent = `${selectedSession.price}`;
+            document.getElementById('packagePrice').textContent = `${selectedSession.packagePrice}`;
+            document.getElementById('packageDetails').textContent = `Better value - use within ${selectedSession.packageDuration} days`;
+            
+            // Reset booking type selection
+            selectBookingType('single');
             
             // Update group size options based on available spots
             const groupSizeSelect = document.querySelector('select[name="groupSize"]');
@@ -252,9 +370,14 @@
             e.preventDefault();
             
             const formData = new FormData(e.target);
+            const isPackageBooking = formData.get('bookingType') === 'true';
+            
             const bookingData = {
                 sessionId: selectedSession._id,
-                groupSize: formData.get('groupSize')
+                groupSize: parseInt(formData.get('groupSize')),
+                isPackageBooking: isPackageBooking,
+                packageId: isPackageBooking ? formData.get('packageId') : null,
+                sessionNumber: isPackageBooking ? parseInt(formData.get('sessionNumber')) : null
             };
             
             try {
@@ -276,6 +399,11 @@
                 alert('Error booking session: ' + error.message);
             }
         });
+
+        // Generate a unique package ID for tracking 8-session packages
+        function generatePackageId() {
+            return 'pkg_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        }
 
         // Cancel booking
         async function cancelBooking(bookingId) {

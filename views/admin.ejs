@@ -5,58 +5,295 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Dashboard - Personal Trainer</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: Arial, sans-serif; background: #f5f5f5; }
-        .header { background: white; padding: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; }
-        .header h1 { color: #333; }
-        .user-info { color: #666; }
-        .logout-btn { background: #dc3545; color: white; padding: 8px 16px; border: none; border-radius: 4px; text-decoration: none; }
-        .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
-        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 30px; }
-        .stat-card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); text-align: center; }
-        .stat-number { font-size: 2.5em; font-weight: bold; color: #4CAF50; margin-bottom: 10px; }
-        .stat-label { color: #666; font-size: 1.1em; }
-        .dashboard-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-        .panel { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        .panel h3 { margin-bottom: 20px; color: #333; border-bottom: 2px solid #4CAF50; padding-bottom: 10px; }
-        .form-group { margin-bottom: 15px; }
-        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; }
-        .form-group input, .form-group select { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; }
-        .btn { padding: 10px 20px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer; }
-        .btn:hover { background: #45a049; }
-        .btn-danger { background: #dc3545; }
-        .btn-danger:hover { background: #c82333; }
-        .btn-small { padding: 5px 10px; font-size: 0.9em; }
-        .btn-email { background: #2196F3; }
-        .btn-email:hover { background: #1976D2; }
-        .session-item { background: #f9f9f9; padding: 15px; margin-bottom: 10px; border-radius: 5px; border-left: 4px solid #4CAF50; }
-        .session-item.body-health { border-left-color: #2196F3; }
-        .session-item.regular-training { border-left-color: #FF9800; }
-        .session-date { font-weight: bold; color: #333; margin-bottom: 8px; }
-        .session-details { color: #666; margin-bottom: 8px; }
-        .exercise-type { display: inline-block; padding: 4px 8px; border-radius: 12px; font-size: 0.8em; font-weight: bold; color: white; margin-right: 10px; }
-        .exercise-type.body-health { background: #2196F3; }
-        .exercise-type.regular-training { background: #FF9800; }
-        .booking-item { background: #fff; padding: 15px; margin: 10px 0; border-left: 3px solid #4CAF50; border-radius: 3px; }
-        .scrollable { max-height: 500px; overflow-y: auto; }
-        
-        /* Notes functionality styles */
-        .notes-section { margin-top: 10px; padding-top: 10px; border-top: 1px solid #eee; }
-        .notes-textarea { width: 100%; min-height: 60px; padding: 8px; border: 1px solid #ddd; border-radius: 4px; resize: vertical; font-family: Arial, sans-serif; font-size: 0.9em; }
-        .notes-controls { display: flex; gap: 10px; margin-top: 5px; align-items: center; }
-        .save-notes-btn { background: #4CAF50; color: white; border: none; padding: 6px 12px; border-radius: 3px; cursor: pointer; font-size: 0.8em; }
-        .save-notes-btn:hover { background: #45a049; }
-        .notes-saved { color: #28a745; font-size: 0.8em; font-weight: bold; }
+        * { 
+            margin: 0; 
+            padding: 0; 
+            box-sizing: border-box; 
+        }
+        body { 
+            font-family: Arial, sans-serif; 
+            background: #f5f5f5; 
+        }
+        .header { 
+            background: white; 
+            padding: 20px; 
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1); 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+        }
+        .header h1 { 
+            color: #333; 
+        }
+        .user-info { 
+            color: #666; 
+        }
+        .logout-btn { 
+            background: #dc3545; 
+            color: white; 
+            padding: 8px 16px; 
+            border: none; 
+            border-radius: 4px; 
+            text-decoration: none; 
+        }
+        .container { 
+            max-width: 1400px; 
+            margin: 0 auto; 
+            padding: 20px; 
+        }
+        .stats { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); 
+            gap: 20px; 
+            margin-bottom: 30px; 
+        }
+        .stat-card { 
+            background: white; 
+            padding: 20px; 
+            border-radius: 8px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
+            text-align: center; 
+        }
+        .stat-number { 
+            font-size: 2.5em; 
+            font-weight: bold; 
+            color: #4CAF50; 
+            margin-bottom: 10px; 
+        }
+        .stat-label { 
+            color: #666; 
+            font-size: 1.1em; 
+        }
+        .dashboard-grid { 
+            display: grid; 
+            grid-template-columns: 1fr 1fr; 
+            gap: 20px; 
+        }
+        .panel { 
+            background: white; 
+            padding: 20px; 
+            border-radius: 8px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
+        }
+        .panel h3 { 
+            margin-bottom: 20px; 
+            color: #333; 
+            border-bottom: 2px solid #4CAF50; 
+            padding-bottom: 10px; 
+        }
+        .form-group { 
+            margin-bottom: 15px; 
+        }
+        .form-group label { 
+            display: block; 
+            margin-bottom: 5px; 
+            font-weight: bold; 
+        }
+        .form-group input, 
+        .form-group select, 
+        .form-group textarea { 
+            width: 100%; 
+            padding: 10px; 
+            border: 1px solid #ddd; 
+            border-radius: 4px; 
+        }
+        .form-group textarea { 
+            resize: vertical; 
+            min-height: 80px; 
+        }
+        .btn { 
+            padding: 10px 20px; 
+            background: #4CAF50; 
+            color: white; 
+            border: none; 
+            border-radius: 4px; 
+            cursor: pointer; 
+        }
+        .btn:hover { 
+            background: #45a049; 
+        }
+        .btn-danger { 
+            background: #dc3545; 
+        }
+        .btn-danger:hover { 
+            background: #c82333; 
+        }
+        .btn-small { 
+            padding: 5px 10px; 
+            font-size: 0.9em; 
+        }
+        .btn-email { 
+            background: #2196F3; 
+        }
+        .btn-email:hover { 
+            background: #1976D2; 
+        }
+        .session-item { 
+            background: #f9f9f9; 
+            padding: 15px; 
+            margin-bottom: 10px; 
+            border-radius: 5px; 
+            border-left: 4px solid #4CAF50; 
+        }
+        .session-item.body-health { 
+            border-left-color: #2196F3; 
+        }
+        .session-item.regular-training { 
+            border-left-color: #FF9800; 
+        }
+        .session-date { 
+            font-weight: bold; 
+            color: #333; 
+            margin-bottom: 8px; 
+        }
+        .session-details { 
+            color: #666; 
+            margin-bottom: 8px; 
+        }
+        .session-trainer { 
+            color: #4CAF50; 
+            font-weight: bold; 
+            margin-bottom: 5px; 
+        }
+        .session-pricing { 
+            background: #e8f5e8; 
+            padding: 8px; 
+            border-radius: 4px; 
+            margin: 8px 0; 
+            font-size: 0.9em; 
+        }
+        .exercise-type { 
+            display: inline-block; 
+            padding: 4px 8px; 
+            border-radius: 12px; 
+            font-size: 0.8em; 
+            font-weight: bold; 
+            color: white; 
+            margin-right: 10px; 
+        }
+        .exercise-type.body-health { 
+            background: #2196F3; 
+        }
+        .exercise-type.regular-training { 
+            background: #FF9800; 
+        }
+        .booking-item { 
+            background: #fff; 
+            padding: 15px; 
+            margin: 10px 0; 
+            border-left: 3px solid #4CAF50; 
+            border-radius: 3px; 
+        }
+        .cancellation-policy { 
+            background: #fff3cd; 
+            border: 1px solid #ffeaa7; 
+            padding: 8px; 
+            border-radius: 4px; 
+            margin: 8px 0; 
+            font-size: 0.9em; 
+            color: #856404; 
+        }
+        .scrollable { 
+            max-height: 500px; 
+            overflow-y: auto; 
+        }
+        .notes-section { 
+            margin-top: 10px; 
+            padding-top: 10px; 
+            border-top: 1px solid #eee; 
+        }
+        .notes-textarea { 
+            width: 100%; 
+            min-height: 60px; 
+            padding: 8px; 
+            border: 1px solid #ddd; 
+            border-radius: 4px; 
+            resize: vertical; 
+            font-family: Arial, sans-serif; 
+            font-size: 0.9em; 
+        }
+        .notes-controls { 
+            display: flex; 
+            gap: 10px; 
+            margin-top: 5px; 
+            align-items: center; 
+        }
+        .save-notes-btn { 
+            background: #4CAF50; 
+            color: white; 
+            border: none; 
+            padding: 6px 12px; 
+            border-radius: 3px; 
+            cursor: pointer; 
+            font-size: 0.8em; 
+        }
+        .save-notes-btn:hover { 
+            background: #45a049; 
+        }
+        .notes-saved { 
+            color: #28a745; 
+            font-size: 0.8em; 
+            font-weight: bold; 
+        }
+        .trainer-item { 
+            background: #f8f9fa; 
+            padding: 15px; 
+            margin: 10px 0; 
+            border-left: 3px solid #17a2b8; 
+            border-radius: 3px; 
+        }
+        .trainer-name { 
+            font-weight: bold; 
+            color: #333; 
+            margin-bottom: 5px; 
+        }
         
         /* Calendar Styles */
-        .calendar-section { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-bottom: 20px; }
-        .calendar-container { max-width: 600px; margin: 0 auto; }
-        .calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-        .calendar-nav { background: #4CAF50; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; }
-        .calendar-nav:hover { background: #45a049; }
-        .calendar-title { font-size: 1.2em; font-weight: bold; color: #333; }
-        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
-        .calendar-day-header { background: #f0f0f0; padding: 10px; text-align: center; font-weight: bold; color: #666; }
+        .calendar-section { 
+            background: white; 
+            padding: 20px; 
+            border-radius: 8px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
+            margin-bottom: 20px; 
+        }
+        .calendar-container { 
+            max-width: 600px; 
+            margin: 0 auto; 
+        }
+        .calendar-header { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            margin-bottom: 20px; 
+        }
+        .calendar-nav { 
+            background: #4CAF50; 
+            color: white; 
+            border: none; 
+            padding: 8px 12px; 
+            border-radius: 4px; 
+            cursor: pointer; 
+        }
+        .calendar-nav:hover { 
+            background: #45a049; 
+        }
+        .calendar-title { 
+            font-size: 1.2em; 
+            font-weight: bold; 
+            color: #333; 
+        }
+        .calendar-grid { 
+            display: grid; 
+            grid-template-columns: repeat(7, 1fr); 
+            gap: 2px; 
+        }
+        .calendar-day-header { 
+            background: #f0f0f0; 
+            padding: 10px; 
+            text-align: center; 
+            font-weight: bold; 
+            color: #666; 
+        }
         .calendar-day { 
             background: white; 
             border: 1px solid #e0e0e0; 
@@ -68,11 +305,24 @@
             display: flex;
             flex-direction: column;
         }
-        .calendar-day:hover { background: #f5f5f5; }
-        .calendar-day.other-month { color: #ccc; background: #f9f9f9; }
-        .calendar-day.has-sessions { background: #e8f5e8; border-color: #4CAF50; }
-        .calendar-day.has-sessions:hover { background: #d4edda; }
-        .calendar-day-number { font-weight: bold; margin-bottom: 2px; }
+        .calendar-day:hover { 
+            background: #f5f5f5; 
+        }
+        .calendar-day.other-month { 
+            color: #ccc; 
+            background: #f9f9f9; 
+        }
+        .calendar-day.has-sessions { 
+            background: #e8f5e8; 
+            border-color: #4CAF50; 
+        }
+        .calendar-day.has-sessions:hover { 
+            background: #d4edda; 
+        }
+        .calendar-day-number { 
+            font-weight: bold; 
+            margin-bottom: 2px; 
+        }
         .calendar-session-count { 
             background: #4CAF50; 
             color: white; 
@@ -118,7 +368,9 @@
             font-weight: bold; 
             cursor: pointer; 
         }
-        .close:hover { color: #000; }
+        .close:hover { 
+            color: #000; 
+        }
         .session-modal-item { 
             background: #f9f9f9; 
             padding: 15px; 
@@ -128,9 +380,15 @@
             transition: all 0.3s;
             border-left: 4px solid transparent;
         }
-        .session-modal-item:hover { background: #f0f0f0; }
-        .session-modal-item.body-health { border-left-color: #2196F3; }
-        .session-modal-item.regular-training { border-left-color: #FF9800; }
+        .session-modal-item:hover { 
+            background: #f0f0f0; 
+        }
+        .session-modal-item.body-health { 
+            border-left-color: #2196F3; 
+        }
+        .session-modal-item.regular-training { 
+            border-left-color: #FF9800; 
+        }
         .member-item { 
             background: white; 
             padding: 15px; 
@@ -140,10 +398,20 @@
         }
         
         @media (max-width: 768px) {
-            .dashboard-grid { grid-template-columns: 1fr; }
-            .calendar-day { min-height: 50px; padding: 4px; }
-            .calendar-day-number { font-size: 0.9em; }
-            .calendar-session-count { font-size: 0.6em; padding: 1px 4px; }
+            .dashboard-grid { 
+                grid-template-columns: 1fr; 
+            }
+            .calendar-day { 
+                min-height: 50px; 
+                padding: 4px; 
+            }
+            .calendar-day-number { 
+                font-size: 0.9em; 
+            }
+            .calendar-session-count { 
+                font-size: 0.6em; 
+                padding: 1px 4px; 
+            }
         }
     </style>
 </head>
@@ -233,6 +501,23 @@
                         </select>
                     </div>
                     <div class="form-group">
+                        <label>Trainer</label>
+                        <select name="trainerId" required>
+                            <option value="">Select a trainer</option>
+                            <% trainers.forEach(trainer => { %>
+                                <option value="<%= trainer._id %>"><%= trainer.name %></option>
+                            <% }); %>
+                        </select>
+                        <small style="color: #666; font-size: 0.9em;">Trainers must register as 'Personal Trainer (Admin)' users first</small>
+                    </div>
+                    <div class="form-group">
+                        <label>Description</label>
+                        <textarea name="description" placeholder="Brief description of the session..."></textarea>
+                    </div>
+                    <div style="background: #e8f5e8; padding: 12px; border-radius: 4px; margin: 15px 0; font-size: 0.9em;">
+                        <strong>Fixed Pricing:</strong> $50 per session | $200 for 8-session package (90 days validity)
+                    </div>
+                    <div class="form-group">
                         <label>Maximum Capacity (1-4 people)</label>
                         <select name="maxCapacity" required>
                             <option value="">Max people allowed</option>
@@ -241,6 +526,9 @@
                             <option value="3">3 people</option>
                             <option value="4">4 people</option>
                         </select>
+                    </div>
+                    <div class="cancellation-policy">
+                        <strong>📋 Cancellation Policy:</strong> Clients can cancel up to 24 hours before the session time.
                     </div>
                     <button type="submit" class="btn">Create Session</button>
                 </form>
@@ -261,6 +549,9 @@
                                         <span style="color: #999; font-size: 0.8em;">(Past)</span>
                                     <% } %>
                                 </div>
+                                <div class="session-trainer">
+                                    👨‍🏫 Trainer: <%= session.trainer ? session.trainer.name : 'No trainer assigned' %>
+                                </div>
                                 <div class="session-details">
                                     <span class="exercise-type <%= session.exerciseType %>">
                                         <%= session.exerciseType === 'body-health' ? 'Body Health' : 'Regular Training' %>
@@ -270,6 +561,15 @@
                                         <span style="color: #999;">(Inactive)</span>
                                     <% } %>
                                 </div>
+                                <% if (session.description) { %>
+                                    <div style="color: #666; font-size: 0.9em; margin: 5px 0;">
+                                        <%= session.description %>
+                                    </div>
+                                <% } %>
+                                <div class="session-pricing">
+                                    💰 Single: $<%= session.price %> | Package (8 sessions): $<%= session.packagePrice %>
+                                    <br>📝 Package valid for <%= session.packageDuration %> days
+                                </div>
                                 <div style="margin-top: 10px;">
                                     <button class="btn btn-danger" onclick="deleteSession('<%= session._id %>')">
                                         🗑️ Delete Session
@@ -278,6 +578,46 @@
                             </div>
                         <% }); %>
                     <% } %>
+                </div>
+            </div>
+        </div>
+
+        <!-- Available Trainers Panel -->
+        <div class="panel" style="margin-top: 20px;">
+            <h3>👨‍🏫 Available Trainers</h3>
+            <div class="scrollable">
+                <% if (trainers.length === 0) { %>
+                    <p style="color: #666; text-align: center; padding: 20px;">
+                        No trainers registered yet<br>
+                        <small>Trainers need to register with 'Personal Trainer (Admin)' role</small>
+                    </p>
+                <% } else { %>
+                    <% trainers.forEach(trainer => { %>
+                        <div class="trainer-item">
+                            <div class="trainer-name">👨‍🏫 <%= trainer.name %></div>
+                            <div style="color: #666; font-size: 0.9em; margin-bottom: 5px;">
+                                📧 <%= trainer.email %>
+                            </div>
+                            <% if (trainer.phone) { %>
+                                <div style="color: #666; font-size: 0.9em; margin-bottom: 5px;">
+                                    📱 <%= trainer.phone %>
+                                </div>
+                            <% } %>
+                            <div style="color: #28a745; font-size: 0.8em;">
+                                ✅ Available for assignment
+                            </div>
+                        </div>
+                    <% }); %>
+                <% } %>
+            </div>
+        </div>
+
+        <!-- Client Management Panel -->
+        <div class="panel" style="margin-top: 20px;">
+            <h3>👥 Client Management</h3>
+            <div class="scrollable">
+                <div id="clientsList">
+                    <p style="color: #666; text-align: center; padding: 20px;">Loading clients...</p>
                 </div>
             </div>
         </div>
@@ -300,6 +640,9 @@
                                         📅 <%= moment(booking.session.date).format('MMM DD, YYYY') %> at <%= booking.session.time %>
                                     </div>
                                     <div style="color: #666; font-size: 0.9em; margin-bottom: 5px;">
+                                        👨‍🏫 Trainer: <%= booking.session.trainer ? booking.session.trainer.name : 'No trainer assigned' %>
+                                    </div>
+                                    <div style="color: #666; font-size: 0.9em; margin-bottom: 5px;">
                                         <span class="exercise-type <%= booking.session.exerciseType %>">
                                             <%= booking.session.exerciseType === 'body-health' ? 'Body Health' : 'Regular Training' %>
                                         </span>
@@ -307,6 +650,17 @@
                                     </div>
                                     <div style="color: #666; font-size: 0.8em;">
                                         📧 <%= booking.client.email %> | 📱 <%= booking.client.phone || 'No phone' %>
+                                    </div>
+                                    <% if (booking.isPackageBooking) { %>
+                                        <div style="background: #e8f4f8; padding: 4px 8px; border-radius: 4px; margin: 5px 0; font-size: 0.8em; color: #0c5460;">
+                                            📦 Package Booking - Session <%= booking.sessionNumber %>/8
+                                        </div>
+                                    <% } %>
+                                    <div class="cancellation-policy">
+                                        ⏰ Can cancel until: <%= moment(booking.cancellationDeadline).format('MMM DD, YYYY HH:mm') %>
+                                        <% if (moment().isAfter(moment(booking.cancellationDeadline))) { %>
+                                            <span style="color: #dc3545; font-weight: bold;">(Cancellation deadline passed)</span>
+                                        <% } %>
                                     </div>
                                 </div>
                                 <div>
@@ -407,11 +761,131 @@
         // Initialize calendar on page load
         document.addEventListener('DOMContentLoaded', function() {
             loadCalendarMonth();
+            loadClients();
         });
+
+        async function loadClients() {
+            try {
+                const response = await fetch('/api/clients');
+                const clients = await response.json();
+                
+                const clientsList = document.getElementById('clientsList');
+                
+                if (clients.length === 0) {
+                    clientsList.innerHTML = '<p style="color: #666; text-align: center; padding: 20px;">No clients registered yet</p>';
+                } else {
+                    clientsList.innerHTML = clients.map(client => {
+                        const hasActivePackage = client.activeSessions > 0;
+                        const isExpired = client.packageExpiry && new Date(client.packageExpiry) < new Date();
+                        
+                        return `
+                            <div class="client-item" style="background: #f8f9fa; padding: 15px; margin: 10px 0; border-left: 3px solid ${hasActivePackage ? '#28a745' : '#6c757d'}; border-radius: 3px;">
+                                <div style="display: flex; justify-content: space-between; align-items: start;">
+                                    <div style="flex: 1;">
+                                        <div style="font-weight: bold; color: #333; margin-bottom: 5px;">
+                                            👤 ${client.name}
+                                        </div>
+                                        <div style="color: #666; font-size: 0.9em; margin-bottom: 3px;">
+                                            📧 ${client.email}
+                                        </div>
+                                        <div style="color: #666; font-size: 0.9em; margin-bottom: 8px;">
+                                            📱 ${client.phone || 'No phone number'}
+                                        </div>
+                                        
+                                        ${hasActivePackage ? `
+                                            <div style="background: ${isExpired ? '#f8d7da' : '#d4edda'}; padding: 8px; border-radius: 4px; margin: 8px 0;">
+                                                <div style="font-weight: bold; color: ${isExpired ? '#721c24' : '#155724'}; margin-bottom: 3px;">
+                                                    📦 Package Status: ${client.activeSessions} sessions remaining
+                                                </div>
+                                                <div style="font-size: 0.8em; color: ${isExpired ? '#721c24' : '#155724'};">
+                                                    ${isExpired ? '⚠️ Expired' : '✅ Active'} until: ${new Date(client.packageExpiry).toLocaleDateString()}
+                                                </div>
+                                            </div>
+                                        ` : `
+                                            <div style="background: #f8f9fa; padding: 8px; border-radius: 4px; margin: 8px 0; border: 1px solid #dee2e6;">
+                                                <div style="color: #6c757d; font-size: 0.9em;">
+                                                    No active package
+                                                </div>
+                                            </div>
+                                        `}
+                                        
+                                        <div style="color: #666; font-size: 0.8em;">
+                                            Member since: ${new Date(client.createdAt).toLocaleDateString()}
+                                        </div>
+                                    </div>
+                                    
+                                    <div style="display: flex; flex-direction: column; gap: 8px;">
+                                        <button class="btn" style="padding: 6px 12px; font-size: 0.8em;" onclick="addPackageToClient('${client._id}')">
+                                            💰 Add 8-Session Package ($200)
+                                        </button>
+                                        ${hasActivePackage ? `
+                                            <button class="btn" style="background: #6c757d; padding: 6px 12px; font-size: 0.8em;" onclick="resetClientPackage('${client._id}')">
+                                                🔄 Reset Package
+                                            </button>
+                                        ` : ''}
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                }
+            } catch (error) {
+                console.error('Error loading clients:', error);
+                document.getElementById('clientsList').innerHTML = '<p style="color: #ff0000; text-align: center; padding: 20px;">Error loading clients</p>';
+            }
+        }
+
+        async function addPackageToClient(clientId) {
+            if (!confirm('Add 8-session package ($200) to this client? This will add 8 sessions and set expiry to 90 days from now.')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/client/${clientId}/add-package`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    alert('8-session package added successfully!');
+                    loadClients(); // Refresh the client list
+                } else {
+                    alert('Error adding package: ' + result.error);
+                }
+            } catch (error) {
+                alert('Error adding package: ' + error.message);
+            }
+        }
+
+        async function resetClientPackage(clientId) {
+            if (!confirm('Reset this client\'s package? This will set their active sessions to 0 and remove package expiry.')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/client/${clientId}/reset-package`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    alert('Client package reset successfully!');
+                    loadClients(); // Refresh the client list
+                } else {
+                    alert('Error resetting package: ' + result.error);
+                }
+            } catch (error) {
+                alert('Error resetting package: ' + error.message);
+            }
+        }
 
         async function loadCalendarMonth() {
             const year = currentDate.getFullYear();
-            const month = currentDate.getMonth() + 1; // API expects 1-12
+            const month = currentDate.getMonth() + 1;
             
             try {
                 const response = await fetch(`/api/calendar/${year}/${month}`);
@@ -419,14 +893,6 @@
                 if (!response.ok) {
                     console.error('Response not ok:', response.status, response.statusText);
                     throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                
-                const contentType = response.headers.get('content-type');
-                if (!contentType || !contentType.includes('application/json')) {
-                    console.error('Response is not JSON, content-type:', contentType);
-                    const text = await response.text();
-                    console.error('Response text:', text.substring(0, 200));
-                    throw new Error('Response is not JSON');
                 }
                 
                 const sessions = await response.json();
@@ -471,7 +937,6 @@
                 dayNumber.textContent = date.getDate();
                 dayElement.appendChild(dayNumber);
                 
-                // Check for sessions on this date (timezone-aware)
                 const calYear = date.getFullYear();
                 const calMonth = date.getMonth();
                 const calDay = date.getDate();
@@ -549,6 +1014,13 @@
                                             ${session.exerciseType === 'body-health' ? 'Body Health' : 'Regular Training'}
                                         </span>
                                     </div>
+                                    <div style="color: #4CAF50; font-weight: bold; margin-bottom: 5px;">
+                                        👨‍🏫 ${session.trainer ? session.trainer.name : 'No trainer assigned'}
+                                    </div>
+                                    ${session.description ? `<div style="color: #666; font-size: 0.9em; margin-bottom: 5px;">${session.description}</div>` : ''}
+                                    <div style="background: #e8f5e8; padding: 4px 8px; border-radius: 4px; font-size: 0.8em; margin-bottom: 5px;">
+                                        💰 ${session.price} single | ${session.packagePrice} package (${session.packageDuration} days)
+                                    </div>
                                     <div style="color: #666; font-size: 0.9em;">
                                         👥 ${session.currentBookings}/${session.maxCapacity} people booked
                                     </div>
@@ -606,9 +1078,13 @@
                             <div style="color: #666; font-size: 0.9em; margin-bottom: 8px;">
                                 👥 Booked for ${booking.groupSize} ${booking.groupSize === 1 ? 'person' : 'people'}
                             </div>
+                            ${booking.isPackageBooking ? `
+                                <div style="background: #e8f4f8; padding: 4px 8px; border-radius: 4px; margin: 5px 0; font-size: 0.8em; color: #0c5460;">
+                                    📦 Package Booking - Session ${booking.sessionNumber}/8
+                                </div>
+                            ` : ''}
                             
-                            <!-- Notes Section in Modal -->
-                            <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #eee;">
+                            <div class="notes-section">
                                 <label style="font-size: 0.9em; font-weight: bold; color: #333; margin-bottom: 5px; display: block;">Session Notes:</label>
                                 <textarea 
                                     id="modal-notes-${booking._id}" 
@@ -653,7 +1129,6 @@
             
             sessionIdInput.value = sessionId;
             
-            // Populate recipients list
             if (bookings && bookings.length > 0) {
                 recipientsList.innerHTML = bookings.map(booking => `
                     <div style="margin-bottom: 8px;">
@@ -670,62 +1145,7 @@
             modal.style.display = 'block';
         }
 
-        // Handle email form submission
-        document.getElementById('emailForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            const formData = new FormData(e.target);
-            const recipients = Array.from(formData.getAll('recipients'));
-            
-            if (recipients.length === 0) {
-                alert('Please select at least one recipient');
-                return;
-            }
-            
-            const emailData = {
-                sessionId: formData.get('sessionId'),
-                subject: formData.get('subject'),
-                message: formData.get('message'),
-                recipients: recipients
-            };
-            
-            try {
-                const response = await fetch('/api/send-session-email', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(emailData)
-                });
-                
-                const result = await response.json();
-                
-                if (result.success) {
-                    alert(`Email sent successfully to ${recipients.length} recipient${recipients.length > 1 ? 's' : ''}!`);
-                    closeModal('emailModal');
-                    e.target.reset();
-                } else {
-                    alert('Error sending email: ' + result.error);
-                }
-            } catch (error) {
-                alert('Error sending email: ' + error.message);
-            }
-        });
-
-        window.onclick = function(event) {
-            const sessionsModal = document.getElementById('sessionsModal');
-            const membersModal = document.getElementById('membersModal');
-            const emailModal = document.getElementById('emailModal');
-            if (event.target === sessionsModal) {
-                sessionsModal.style.display = 'none';
-            }
-            if (event.target === membersModal) {
-                membersModal.style.display = 'none';
-            }
-            if (event.target === emailModal) {
-                emailModal.style.display = 'none';
-            }
-        }
-
-        // Handle session creation
+        // Handle forms
         document.getElementById('sessionForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             
@@ -734,7 +1154,9 @@
                 date: formData.get('date'),
                 time: formData.get('time'),
                 exerciseType: formData.get('exerciseType'),
-                maxCapacity: formData.get('maxCapacity')
+                maxCapacity: formData.get('maxCapacity'),
+                trainerId: formData.get('trainerId'),
+                description: formData.get('description')
             };
             
             try {
@@ -757,7 +1179,46 @@
             }
         });
 
-        // Delete session
+        document.getElementById('emailForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = new FormData(e.target);
+            const recipients = Array.from(formData.getAll('recipients'));
+            
+            if (recipients.length === 0) {
+                alert('Please select at least one recipient');
+                return;
+            }
+            
+            const emailData = {
+                sessionId: formData.get('sessionId'),
+                subject: formData.get('subject'),
+                message: formData.get('message'),
+                recipients: recipients
+            };
+            
+            try {
+                const response = await fetch('/api/send-session-email', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(sessionData)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert(`Email sent successfully to ${recipients.length} recipient${recipients.length > 1 ? 's' : ''}!`);
+                    closeModal('emailModal');
+                    e.target.reset();
+                } else {
+                    alert('Error sending email: ' + result.error);
+                }
+            } catch (error) {
+                alert('Error sending email: ' + error.message);
+            }
+        });
+
+        // Utility functions
         async function deleteSession(sessionId) {
             if (!confirm('Are you sure you want to delete this session? This will also cancel all bookings for this session.')) {
                 return;
@@ -781,7 +1242,6 @@
             }
         }
 
-        // Delete booking
         async function deleteBooking(bookingId) {
             if (!confirm('Are you sure you want to cancel this booking?')) {
                 return;
@@ -805,7 +1265,6 @@
             }
         }
 
-        // Save booking notes from main booking list
         async function saveBookingNotes(bookingId) {
             const notesTextarea = document.getElementById(`notes-${bookingId}`);
             const statusSpan = document.getElementById(`notes-status-${bookingId}`);
@@ -821,7 +1280,6 @@
                 const result = await response.json();
 
                 if (result.success) {
-                    // Show success feedback
                     statusSpan.style.display = 'inline';
                     setTimeout(() => {
                         statusSpan.style.display = 'none';
@@ -834,7 +1292,6 @@
             }
         }
 
-        // Save booking notes from modal
         async function saveBookingNotesFromModal(bookingId) {
             const notesTextarea = document.getElementById(`modal-notes-${bookingId}`);
             const statusSpan = document.getElementById(`modal-notes-status-${bookingId}`);
@@ -850,13 +1307,11 @@
                 const result = await response.json();
 
                 if (result.success) {
-                    // Show success feedback
                     statusSpan.style.display = 'inline';
                     setTimeout(() => {
                         statusSpan.style.display = 'none';
                     }, 3000);
                     
-                    // Also update the main booking list textarea if it exists
                     const mainTextarea = document.getElementById(`notes-${bookingId}`);
                     if (mainTextarea) {
                         mainTextarea.value = notes;
@@ -866,6 +1321,21 @@
                 }
             } catch (error) {
                 alert('Error saving notes: ' + error.message);
+            }
+        }
+
+        window.onclick = function(event) {
+            const sessionsModal = document.getElementById('sessionsModal');
+            const membersModal = document.getElementById('membersModal');
+            const emailModal = document.getElementById('emailModal');
+            if (event.target === sessionsModal) {
+                sessionsModal.style.display = 'none';
+            }
+            if (event.target === membersModal) {
+                membersModal.style.display = 'none';
+            }
+            if (event.target === emailModal) {
+                emailModal.style.display = 'none';
             }
         }
     </script>

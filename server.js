@@ -25,7 +25,7 @@ if (!MONGODB_URI) {
 
 mongoose.connect(MONGODB_URI);
 
-// User Schema (updated with password reset fields)
+// User Schema (updated with package tracking)
 const UserSchema = new mongoose.Schema({
   name: { type: String, required: true },
   email: { type: String, required: true, unique: true },
@@ -34,10 +34,13 @@ const UserSchema = new mongoose.Schema({
   phone: { type: String },
   resetPasswordToken: { type: String },
   resetPasswordExpires: { type: Date },
+  // Package tracking for 8-session packages
+  activeSessions: { type: Number, default: 0 },
+  packageExpiry: { type: Date },
   createdAt: { type: Date, default: Date.now }
 });
 
-// Session Schema (Admin creates available sessions)
+// Session Schema (updated with trainer reference to User)
 const SessionSchema = new mongoose.Schema({
   date: { type: Date, required: true },
   time: { type: String, required: true },
@@ -46,10 +49,16 @@ const SessionSchema = new mongoose.Schema({
   currentBookings: { type: Number, default: 0 },
   isActive: { type: Boolean, default: true },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  // Trainer is a reference to User with role 'admin' (trainer)
+  trainer: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  description: { type: String, default: '' },
+  price: { type: Number, required: true }, // Price for single session
+  packagePrice: { type: Number, required: true }, // Price for 8-session package
+  packageDuration: { type: Number, default: 90 }, // Days to use 8 sessions (default 90 days)
   createdAt: { type: Date, default: Date.now }
 });
 
-// Booking Schema (Clients book sessions) - updated with reminder tracking
+// Booking Schema (updated with cancellation policy and package tracking)
 const BookingSchema = new mongoose.Schema({
   session: { type: mongoose.Schema.Types.ObjectId, ref: 'Session', required: true },
   client: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
@@ -57,7 +66,38 @@ const BookingSchema = new mongoose.Schema({
   status: { type: String, enum: ['confirmed', 'cancelled'], default: 'confirmed' },
   notes: { type: String, default: '' },
   reminderSent: { type: Boolean, default: false },
+  // New fields for cancellation policy
+  canCancel: { type: Boolean, default: true },
+  cancellationDeadline: { type: Date },
+  // Package tracking
+  isPackageBooking: { type: Boolean, default: false },
+  packageId: { type: String }, // Reference to track 8-session packages
+  sessionNumber: { type: Number }, // Which session in the package (1-8)
   createdAt: { type: Date, default: Date.now }
+});
+
+// Add pre-save middleware to calculate cancellation deadline
+BookingSchema.pre('save', async function(next) {
+  if (this.isNew) {
+    try {
+      // Load the session to get the date and time
+      const session = await mongoose.model('Session').findById(this.session);
+      if (session) {
+        // Parse the session date and time
+        const sessionDate = new Date(session.date);
+        const [hours, minutes] = session.time.split(':');
+        sessionDate.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+        
+        // Calculate cancellation deadline (24 hours before session)
+        const cancellationDeadline = new Date(sessionDate.getTime() - (24 * 60 * 60 * 1000));
+        this.cancellationDeadline = cancellationDeadline;
+        this.canCancel = new Date() < cancellationDeadline;
+      }
+    } catch (error) {
+      console.error('Error calculating cancellation deadline:', error);
+    }
+  }
+  next();
 });
 
 const User = mongoose.model('User', UserSchema);
@@ -92,12 +132,22 @@ function requireAdmin(req, res, next) {
   next();
 }
 
-// CALENDAR API ROUTES
-// API: Get sessions for a specific month (for calendar display)
+// TRAINER ROUTES (simplified - just get trainers from users)
+// API: Get all trainers (users with role 'admin')
+app.get('/api/trainers', requireAdmin, async (req, res) => {
+  try {
+    const trainers = await User.find({ role: 'admin' }, 'name email phone');
+    res.json(trainers);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// CALENDAR API ROUTES (updated to include trainer info)
 app.get('/api/calendar/:year/:month', requireAdmin, async (req, res) => {
   try {
     const year = parseInt(req.params.year);
-    const month = parseInt(req.params.month) - 1; // JavaScript months are 0-indexed
+    const month = parseInt(req.params.month) - 1;
     
     const startDate = new Date(year, month, 1);
     const endDate = new Date(year, month + 1, 0);
@@ -108,9 +158,8 @@ app.get('/api/calendar/:year/:month', requireAdmin, async (req, res) => {
         $lte: endDate
       },
       isActive: true
-    }).populate('createdBy');
+    }).populate(['createdBy', 'trainer']);
     
-    // Get bookings for each session
     const sessionsWithBookings = await Promise.all(
       sessions.map(async (session) => {
         const bookings = await Booking.find({ 
@@ -131,7 +180,7 @@ app.get('/api/calendar/:year/:month', requireAdmin, async (req, res) => {
   }
 });
 
-// API: Get detailed sessions for a specific date
+// API: Get detailed sessions for a specific date (updated with trainer info)
 app.get('/api/sessions/date/:date', requireAdmin, async (req, res) => {
   try {
     const date = new Date(req.params.date);
@@ -144,9 +193,8 @@ app.get('/api/sessions/date/:date', requireAdmin, async (req, res) => {
         $lt: nextDay
       },
       isActive: true
-    }).populate('createdBy').sort({ time: 1 });
+    }).populate(['createdBy', 'trainer']).sort({ time: 1 });
     
-    // Get bookings with client details for each session
     const sessionsWithDetails = await Promise.all(
       sessions.map(async (session) => {
         const bookings = await Booking.find({ 
@@ -171,10 +219,10 @@ app.get('/api/sessions/date/:date', requireAdmin, async (req, res) => {
   }
 });
 
-// API: Get session details with all bookings (for modal view)
+// API: Get session details with all bookings (updated with trainer info)
 app.get('/api/session/:id/details', requireAdmin, async (req, res) => {
   try {
-    const session = await Session.findById(req.params.id).populate('createdBy');
+    const session = await Session.findById(req.params.id).populate(['createdBy', 'trainer']);
     if (!session) {
       return res.status(404).json({ error: 'Session not found' });
     }
@@ -213,15 +261,13 @@ app.post('/forgot-password', async (req, res) => {
       });
     }
     
-    // Generate reset token
     const resetToken = crypto.randomBytes(32).toString('hex');
-    const resetTokenExpiry = Date.now() + 3600000; // 1 hour
+    const resetTokenExpiry = Date.now() + 3600000;
     
     user.resetPasswordToken = resetToken;
     user.resetPasswordExpires = resetTokenExpiry;
     await user.save();
     
-    // Send reset email
     const result = await emailService.sendPasswordReset(user, resetToken);
     
     if (result.success) {
@@ -292,7 +338,6 @@ app.post('/reset-password', async (req, res) => {
       });
     }
     
-    // Update password and clear reset fields
     user.password = password;
     user.resetPasswordToken = undefined;
     user.resetPasswordExpires = undefined;
@@ -310,7 +355,6 @@ app.post('/reset-password', async (req, res) => {
 });
 
 // EMAIL FUNCTIONALITY ROUTES
-// API: Send custom email to session members
 app.post('/api/send-session-email', requireAdmin, async (req, res) => {
   try {
     const { sessionId, subject, message, recipients } = req.body;
@@ -319,16 +363,12 @@ app.post('/api/send-session-email', requireAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
     
-    // Get session details
     const session = await Session.findById(sessionId);
     if (!session) {
       return res.status(404).json({ error: 'Session not found' });
     }
     
-    // Get recipient details
     const recipientUsers = await User.find({ _id: { $in: recipients } });
-    
-    // Send emails
     const results = await emailService.sendBulkCustomMessage(recipientUsers, subject, message);
     
     res.json({ success: true, results });
@@ -337,7 +377,6 @@ app.post('/api/send-session-email', requireAdmin, async (req, res) => {
   }
 });
 
-// API: Send custom email to specific clients
 app.post('/api/send-custom-email', requireAdmin, async (req, res) => {
   try {
     const { recipients, subject, message } = req.body;
@@ -346,10 +385,7 @@ app.post('/api/send-custom-email', requireAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
     
-    // Get recipient details
     const recipientUsers = await User.find({ _id: { $in: recipients } });
-    
-    // Send emails
     const results = await emailService.sendBulkCustomMessage(recipientUsers, subject, message);
     
     res.json({ success: true, results });
@@ -358,7 +394,6 @@ app.post('/api/send-custom-email', requireAdmin, async (req, res) => {
   }
 });
 
-// API: Test reminder system (for development)
 app.post('/api/test-reminders', requireAdmin, async (req, res) => {
   try {
     await reminderScheduler.sendRemindersNow();
@@ -368,13 +403,11 @@ app.post('/api/test-reminders', requireAdmin, async (req, res) => {
   }
 });
 
-// EXISTING ROUTES
-// Login/Register page
+// LOGIN/REGISTER ROUTES
 app.get('/login', (req, res) => {
   res.render('login');
 });
 
-// Handle login
 app.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -395,7 +428,6 @@ app.post('/login', async (req, res) => {
   }
 });
 
-// Handle registration
 app.post('/register', async (req, res) => {
   try {
     const { name, email, password, phone, role } = req.body;
@@ -419,87 +451,110 @@ app.post('/register', async (req, res) => {
   }
 });
 
-// Logout
 app.get('/logout', (req, res) => {
   currentUser = null;
   res.redirect('/login');
 });
 
-// Home page - Calendar booking for clients
+// HOME PAGE (updated to show trainer and pricing info)
 app.get('/', requireAuth, async (req, res) => {
-  if (currentUser.role === 'admin') {
-    return res.redirect('/admin');
+  try {
+    if (currentUser.role === 'admin') {
+      return res.redirect('/admin');
+    }
+    
+    const sessions = await Session.find({ isActive: true }).populate(['createdBy', 'trainer']);
+    const bookings = await Booking.find({ client: currentUser._id, status: 'confirmed' }).populate({
+      path: 'session',
+      populate: { path: 'trainer' }
+    });
+    
+    res.render('index', { sessions, bookings, moment, user: currentUser });
+  } catch (error) {
+    console.error('Error loading home page:', error);
+    res.render('login', { error: 'Error loading page' });
   }
-  
-  const sessions = await Session.find({ isActive: true }).populate('createdBy');
-  const bookings = await Booking.find({ client: currentUser._id, status: 'confirmed' }).populate('session');
-  
-  res.render('index', { sessions, bookings, moment, user: currentUser });
 });
 
-// Admin Dashboard - Create sessions and view bookings
+// ADMIN DASHBOARD (updated to get trainers from users)
 app.get('/admin', requireAdmin, async (req, res) => {
-  const sessions = await Session.find({}).populate('createdBy').sort({ date: 1, time: 1 });
-  const bookings = await Booking.find({ status: 'confirmed' }).populate(['session', 'client']).sort({ createdAt: -1 });
-  
-  // Statistics
-  const totalSessions = sessions.length;
-  const activeSessions = sessions.filter(s => s.isActive && moment(s.date).isAfter(moment())).length;
-  const totalBookings = bookings.length;
-  const totalClients = bookings.reduce((sum, b) => sum + b.groupSize, 0);
-  
-  res.render('admin', { 
-    sessions,
-    bookings,
-    stats: {
-      totalSessions,
-      activeSessions, 
-      totalBookings,
-      totalClients
-    },
-    moment,
-    user: currentUser
-  });
+  try {
+    const sessions = await Session.find({}).populate(['createdBy', 'trainer']).sort({ date: 1, time: 1 });
+    const bookings = await Booking.find({ status: 'confirmed' }).populate([
+      { path: 'session', populate: { path: 'trainer' } },
+      'client'
+    ]).sort({ createdAt: -1 });
+    const trainers = await User.find({ role: 'admin' }, 'name email phone'); // Get users with admin role
+    
+    // Statistics
+    const totalSessions = sessions.length;
+    const activeSessions = sessions.filter(s => s.isActive && moment(s.date).isAfter(moment())).length;
+    const totalBookings = bookings.length;
+    const totalClients = bookings.reduce((sum, b) => sum + b.groupSize, 0);
+    
+    res.render('admin', { 
+      sessions,
+      bookings,
+      trainers,
+      stats: {
+        totalSessions,
+        activeSessions, 
+        totalBookings,
+        totalClients
+      },
+      moment,
+      user: currentUser
+    });
+  } catch (error) {
+    console.error('Error loading admin dashboard:', error);
+    res.render('login', { error: 'Error loading admin dashboard' });
+  }
 });
 
-// Trainer dashboard (old route for backward compatibility)
 app.get('/trainer', requireAdmin, (req, res) => {
   res.redirect('/admin');
 });
 
-// API: Get available sessions for a specific date
+// API: Get available sessions for a specific date (FIXED - added trainer population)
 app.get('/api/sessions/:date', async (req, res) => {
-  const date = req.params.date;
-  const sessions = await Session.find({
-    date: {
-      $gte: new Date(date),
-      $lt: new Date(moment(date).add(1, 'day').toISOString())
-    },
-    isActive: true
-  });
-  
-  // Get booking counts for each session
-  const sessionsWithBookings = await Promise.all(
-    sessions.map(async (session) => {
-      const bookings = await Booking.find({ session: session._id, status: 'confirmed' });
-      const currentBookings = bookings.reduce((sum, b) => sum + b.groupSize, 0);
-      return {
-        ...session.toObject(),
-        currentBookings,
-        spotsLeft: session.maxCapacity - currentBookings
-      };
-    })
-  );
-  
-  res.json(sessionsWithBookings);
+  try {
+    const date = req.params.date;
+    const sessions = await Session.find({
+      date: {
+        $gte: new Date(date),
+        $lt: new Date(moment(date).add(1, 'day').toISOString())
+      },
+      isActive: true
+    }).populate('trainer'); // FIXED: Added trainer population
+    
+    const sessionsWithBookings = await Promise.all(
+      sessions.map(async (session) => {
+        const bookings = await Booking.find({ session: session._id, status: 'confirmed' });
+        const currentBookings = bookings.reduce((sum, b) => sum + b.groupSize, 0);
+        return {
+          ...session.toObject(),
+          currentBookings,
+          spotsLeft: session.maxCapacity - currentBookings
+        };
+      })
+    );
+    
+    res.json(sessionsWithBookings);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
-// API: Create new session (Admin only)
+// API: Create new session (updated with trainer and pricing)
 app.post('/api/session', requireAdmin, async (req, res) => {
   try {
-    const { date, time, exerciseType, maxCapacity } = req.body;
+    const { date, time, exerciseType, maxCapacity, trainerId, description, price, packagePrice, packageDuration } = req.body;
     
-    // Check if session already exists at this date/time
+    // Validate required fields
+    if (!date || !time || !exerciseType || !maxCapacity || !trainerId || !price || !packagePrice) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+    
     const existingSession = await Session.findOne({ date: new Date(date), time });
     if (existingSession) {
       return res.status(400).json({ error: 'Session already exists at this date and time' });
@@ -510,6 +565,11 @@ app.post('/api/session', requireAdmin, async (req, res) => {
       time,
       exerciseType,
       maxCapacity: parseInt(maxCapacity),
+      trainer: trainerId,
+      description: description || '',
+      price: parseFloat(price),
+      packagePrice: parseFloat(packagePrice),
+      packageDuration: parseInt(packageDuration) || 90,
       createdBy: currentUser._id
     });
     
@@ -520,16 +580,16 @@ app.post('/api/session', requireAdmin, async (req, res) => {
   }
 });
 
-// API: Create new booking (Clients) - WITH EMAIL NOTIFICATIONS
+// API: Create new booking (updated with cancellation deadline and package tracking)
 app.post('/api/booking', requireAuth, async (req, res) => {
   try {
-    const { sessionId, groupSize } = req.body;
+    const { sessionId, groupSize, isPackageBooking, packageId, sessionNumber } = req.body;
     
     if (currentUser.role === 'admin') {
       return res.status(403).json({ error: 'Admins cannot book sessions' });
     }
     
-    const session = await Session.findById(sessionId).populate('createdBy');
+    const session = await Session.findById(sessionId).populate(['createdBy', 'trainer']);
     if (!session || !session.isActive) {
       return res.status(400).json({ error: 'Session not available' });
     }
@@ -545,10 +605,21 @@ app.post('/api/booking', requireAuth, async (req, res) => {
     const booking = new Booking({
       session: sessionId,
       client: currentUser._id,
-      groupSize: parseInt(groupSize)
+      groupSize: parseInt(groupSize),
+      isPackageBooking: isPackageBooking || false,
+      packageId: packageId || null,
+      sessionNumber: sessionNumber || null
     });
     
     await booking.save();
+    
+    // Update user's package tracking if this is a package booking
+    if (isPackageBooking) {
+      await User.findByIdAndUpdate(currentUser._id, {
+        $inc: { activeSessions: 1 },
+        $set: { packageExpiry: moment().add(session.packageDuration, 'days').toDate() }
+      });
+    }
     
     // Send confirmation emails
     try {
@@ -561,7 +632,6 @@ app.post('/api/booking', requireAuth, async (req, res) => {
       console.log('Booking confirmation emails sent:', emailResult);
     } catch (emailError) {
       console.error('Error sending confirmation emails:', emailError);
-      // Don't fail the booking if email fails
     }
     
     res.json({ success: true, booking });
@@ -570,14 +640,15 @@ app.post('/api/booking', requireAuth, async (req, res) => {
   }
 });
 
-// API: Delete session (Admin only)
+// API: Delete session (updated with trainer info)
 app.delete('/api/session/:id', requireAdmin, async (req, res) => {
   try {
-    // Get all bookings for this session before deleting
     const bookings = await Booking.find({ session: req.params.id, status: 'confirmed' })
-      .populate(['session', 'client']);
+      .populate([
+        { path: 'session', populate: { path: 'trainer' } },
+        'client'
+      ]);
     
-    // Send cancellation emails to all booked clients
     for (const booking of bookings) {
       try {
         await emailService.sendCancellationNotification(
@@ -590,9 +661,7 @@ app.delete('/api/session/:id', requireAdmin, async (req, res) => {
       }
     }
     
-    // Delete all bookings for this session
     await Booking.deleteMany({ session: req.params.id });
-    // Then delete the session
     await Session.findByIdAndDelete(req.params.id);
     
     res.json({ success: true });
@@ -601,14 +670,39 @@ app.delete('/api/session/:id', requireAdmin, async (req, res) => {
   }
 });
 
-// API: Delete booking - WITH EMAIL NOTIFICATIONS
+// API: Delete booking (updated with 24-hour cancellation policy)
 app.delete('/api/booking/:id', requireAuth, async (req, res) => {
   try {
-    const booking = await Booking.findById(req.params.id).populate(['session', 'client']);
+    const booking = await Booking.findById(req.params.id).populate([
+      { path: 'session', populate: { path: 'trainer' } },
+      'client'
+    ]);
     
-    // Check if user owns this booking or is admin
+    if (!booking) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+    
     if (currentUser.role !== 'admin' && booking.client._id.toString() !== currentUser._id.toString()) {
       return res.status(403).json({ error: 'Not authorized' });
+    }
+    
+    // Check 24-hour cancellation policy for non-admin users
+    if (currentUser.role !== 'admin') {
+      const now = new Date();
+      const cancellationDeadline = new Date(booking.cancellationDeadline);
+      
+      if (now > cancellationDeadline) {
+        return res.status(400).json({ 
+          error: 'Cannot cancel booking within 24 hours of the session time' 
+        });
+      }
+    }
+    
+    // Update user's package tracking if this was a package booking
+    if (booking.isPackageBooking) {
+      await User.findByIdAndUpdate(booking.client._id, {
+        $inc: { activeSessions: -1 }
+      });
     }
     
     // Send cancellation email
@@ -629,7 +723,7 @@ app.delete('/api/booking/:id', requireAuth, async (req, res) => {
   }
 });
 
-// API: Update booking notes (Admin only)
+// API: Update booking notes
 app.put('/api/booking/:id/notes', requireAdmin, async (req, res) => {
   try {
     const { notes } = req.body;
@@ -655,3 +749,59 @@ app.listen(PORT, () => {
   console.log('Email service initialized');
   console.log('Reminder scheduler running - will send 2-hour reminders automatically');
 });
+
+// Add these routes to your server.js file
+
+// API: Get all clients
+app.get('/api/clients', requireAdmin, async (req, res) => {
+  try {
+    const clients = await User.find({ role: 'client' }, 'name email phone activeSessions packageExpiry createdAt');
+    res.json(clients);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// API: Add 8-session package to client
+app.post('/api/client/:id/add-package', requireAdmin, async (req, res) => {
+  try {
+    const clientId = req.params.id;
+    const client = await User.findById(clientId);
+    
+    if (!client || client.role !== 'client') {
+      return res.status(404).json({ error: 'Client not found' });
+    }
+
+    // Add 8 sessions and set expiry to 90 days from now
+    const updatedClient = await User.findByIdAndUpdate(clientId, {
+      $inc: { activeSessions: 8 },
+      $set: { packageExpiry: moment().add(90, 'days').toDate() }
+    }, { new: true });
+
+    res.json({ success: true, client: updatedClient });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// API: Reset client package
+app.post('/api/client/:id/reset-package', requireAdmin, async (req, res) => {
+  try {
+    const clientId = req.params.id;
+    const updatedClient = await User.findByIdAndUpdate(clientId, {
+      $set: { 
+        activeSessions: 0,
+        packageExpiry: null 
+      }
+    }, { new: true });
+
+    if (!updatedClient) {
+      return res.status(404).json({ error: 'Client not found' });
+    }
+
+    res.json({ success: true, client: updatedClient });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
