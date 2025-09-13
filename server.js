@@ -548,10 +548,11 @@ app.get('/api/sessions/:date', async (req, res) => {
 // API: Create new session (updated with trainer and pricing)
 app.post('/api/session', requireAdmin, async (req, res) => {
   try {
-    const { date, time, exerciseType, maxCapacity, trainerId, description, price, packagePrice, packageDuration } = req.body;
+    // Remove price, packagePrice, packageDuration from destructuring
+    const { date, time, exerciseType, maxCapacity, trainerId, description } = req.body;
     
-    // Validate required fields
-    if (!date || !time || !exerciseType || !maxCapacity || !trainerId || !price || !packagePrice) {
+    // Update validation - remove price and packagePrice checks
+    if (!date || !time || !exerciseType || !maxCapacity || !trainerId) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
     
@@ -560,6 +561,11 @@ app.post('/api/session', requireAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Session already exists at this date and time' });
     }
     
+    // Use fixed pricing
+    const price = 50;
+    const packagePrice = 200;
+    const packageDuration = 90;
+    
     const session = new Session({
       date: new Date(date),
       time,
@@ -567,9 +573,9 @@ app.post('/api/session', requireAdmin, async (req, res) => {
       maxCapacity: parseInt(maxCapacity),
       trainer: trainerId,
       description: description || '',
-      price: parseFloat(price),
-      packagePrice: parseFloat(packagePrice),
-      packageDuration: parseInt(packageDuration) || 90,
+      price: price,           // Fixed values
+      packagePrice: packagePrice,
+      packageDuration: packageDuration,
       createdBy: currentUser._id
     });
     
